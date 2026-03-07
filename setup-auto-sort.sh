@@ -56,7 +56,8 @@ mkdir -p "$DOWNLOAD_DIR/pdf" \
          "$DOWNLOAD_DIR/music" \
          "$DOWNLOAD_DIR/code" \
          "$DOWNLOAD_DIR/datasets" \
-         "$DOWNLOAD_DIR/apps"
+         "$DOWNLOAD_DIR/apps" \
+         "$DOWNLOAD_DIR/fonts"
 
 # Function to move a file while handling duplicates
 move_file() {
@@ -96,7 +97,7 @@ sort_existing_files() {
 
         case "$EXT" in
             pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
             jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
             mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
             mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
@@ -104,6 +105,7 @@ sort_existing_files() {
             py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
             csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
             appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+            ttf|otf|woff|woff2) move_file "$FILE" "$DOWNLOAD_DIR/fonts/" ;;
         esac
     done
     echo "Existing files sorted."
@@ -132,7 +134,7 @@ do
     # 4. Sort files based on extension
     case "$EXT" in
         pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
         jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
         mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
         mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
@@ -140,6 +142,7 @@ do
         py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
         csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
         appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+        ttf|otf|woff|woff2) move_file "$FILE" "$DOWNLOAD_DIR/fonts/" ;;
     esac
 done
 EOF
@@ -151,51 +154,93 @@ EOF
 # Function to setup autostart
 setup_autostart() {
     echo ""
-    read -p "Do you want to run the auto-sort script automatically at startup? (y/n): " choice
-    case "$choice" in 
-        y|Y ) 
-            # Detect shell and config file
-            local shell_name=$(basename "$SHELL")
-            local config_file=""
+    echo "--- Autostart Configuration ---"
+    
+    local CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+    
+    # Cleanup old shell-based autostart if it exists
+    local shells=(".bashrc" ".zshrc" ".profile" ".config/fish/config.fish")
+    for shell_file in "${shells[@]}"; do
+        if [ -f "$HOME/$shell_file" ]; then
+            sed -i '/# Auto-sort downloads startup/d' "$HOME/$shell_file" 2>/dev/null
+            sed -i '/pgrep -f "auto-sort-downloads.sh"/d' "$HOME/$shell_file" 2>/dev/null
+        fi
+    done
 
-            case "$shell_name" in
-                bash) 
-                    config_file="$HOME/.bashrc"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-                zsh)
-                    config_file="$HOME/.zshrc"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-                fish)
-                    config_file="$HOME/.config/fish/config.fish"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null; or nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-                *)
-                    config_file="$HOME/.profile"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-            esac
+    echo "How would you like to handle autostart?"
+    echo "1) Systemd user service (Recommended for most modern distros)"
+    echo "2) XDG Autostart (.desktop file, best for GNOME/KDE/XFCE)"
+    echo "3) Hyprland (exec-once in hyprland.conf)"
+    echo "4) None / Manual"
+    
+    local default_choice=1
+    if [ "$XDG_CURRENT_DESKTOP" = "Hyprland" ] || [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+        default_choice=3
+    elif [ -d "$CONFIG_DIR/autostart" ]; then
+        default_choice=2
+    fi
+    
+    read -p "Select an option [$default_choice]: " choice
+    choice=${choice:-$default_choice}
 
-            # Ensure config directory exists
-            mkdir -p "$(dirname "$config_file")"
+    case "$choice" in
+        1)
+            if command_exists systemctl; then
+                mkdir -p "$CONFIG_DIR/systemd/user"
+                cat > "$CONFIG_DIR/systemd/user/auto-sort-downloads.service" << EOF
+[Unit]
+Description=Auto Sort Downloads Service
+After=network.target
 
-            if [ -f "$config_file" ] || [ ! -e "$config_file" ]; then
-                # Check if already added
-                if [ -f "$config_file" ] && grep -Fq "auto-sort-downloads.sh" "$config_file"; then
-                    echo "Autostart command already exists in $config_file."
-                else
-                    echo "" >> "$config_file"
-                    echo "# Auto-sort downloads startup" >> "$config_file"
-                    echo "$autostart_cmd" >> "$config_file"
-                    echo "Added autostart command to $config_file."
-                fi
+[Service]
+ExecStart=$HOME/.local/bin/auto-sort-downloads.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+                systemctl --user daemon-reload
+                systemctl --user enable auto-sort-downloads.service
+                systemctl --user start auto-sort-downloads.service
+                echo "Systemd user service enabled and started."
             else
-                echo "Could not handle configuration file $config_file. Please add the following command manually:"
-                echo "$autostart_cmd"
+                echo "systemctl not found. Please choose another method."
+                setup_autostart
             fi
             ;;
-        * ) 
+        2)
+            mkdir -p "$CONFIG_DIR/autostart"
+            local desktop_file="$CONFIG_DIR/autostart/auto-sort-downloads.desktop"
+            cat > "$desktop_file" << EOF
+[Desktop Entry]
+Type=Application
+Exec=$HOME/.local/bin/auto-sort-downloads.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Auto Sort Downloads
+Comment=Automatically sort downloads folder
+EOF
+            echo "Added autostart entry to $desktop_file."
+            ;;
+        3)
+            local HYPR_CONF="$CONFIG_DIR/hypr/hyprland.conf"
+            if [ -f "$HYPR_CONF" ]; then
+                if grep -Fq "auto-sort-downloads.sh" "$HYPR_CONF"; then
+                    echo "Autostart already configured in hyprland.conf."
+                else
+                    echo "" >> "$HYPR_CONF"
+                    echo "# Auto-sort downloads startup" >> "$HYPR_CONF"
+                    echo "exec-once = $HOME/.local/bin/auto-sort-downloads.sh" >> "$HYPR_CONF"
+                    echo "Added autostart command to $HYPR_CONF."
+                fi
+            else
+                echo "Hyprland config not found at $HYPR_CONF."
+                setup_autostart
+            fi
+            ;;
+        *)
             echo "Skipping autostart setup."
             ;;
     esac
