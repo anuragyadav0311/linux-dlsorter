@@ -41,7 +41,7 @@ A background script that automatically organizes your Linux downloads — sortin
 Clone the repo and run the setup script:
 
 ```bash
-git clone https://github.com/yourusername/linux-dlsorter.git
+git clone https://github.com/anuragyadav0311/linux-dlsorter.git
 cd linux-dlsorter
 bash setup-auto-sort.sh
 ```
