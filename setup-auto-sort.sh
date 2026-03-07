@@ -154,45 +154,53 @@ setup_autostart() {
     read -p "Do you want to run the auto-sort script automatically at startup? (y/n): " choice
     case "$choice" in 
         y|Y ) 
-            # Detect shell and config file
-            local shell_name=$(basename "$SHELL")
-            local config_file=""
-
-            case "$shell_name" in
-                bash) 
-                    config_file="$HOME/.bashrc"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-                zsh)
-                    config_file="$HOME/.zshrc"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-                fish)
-                    config_file="$HOME/.config/fish/config.fish"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null; or nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-                *)
-                    config_file="$HOME/.profile"
-                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
-                    ;;
-            esac
-
-            # Ensure config directory exists
-            mkdir -p "$(dirname "$config_file")"
-
-            if [ -f "$config_file" ] || [ ! -e "$config_file" ]; then
-                # Check if already added
-                if [ -f "$config_file" ] && grep -Fq "auto-sort-downloads.sh" "$config_file"; then
-                    echo "Autostart command already exists in $config_file."
-                else
-                    echo "" >> "$config_file"
-                    echo "# Auto-sort downloads startup" >> "$config_file"
-                    echo "$autostart_cmd" >> "$config_file"
-                    echo "Added autostart command to $config_file."
+            # Cleanup old shell-based autostart if it exists
+            local shells=(".bashrc" ".zshrc" ".profile" ".config/fish/config.fish")
+            for shell_file in "${shells[@]}"; do
+                if [ -f "$HOME/$shell_file" ]; then
+                    sed -i '/# Auto-sort downloads startup/d' "$HOME/$shell_file" 2>/dev/null
+                    sed -i '/pgrep -f "auto-sort-downloads.sh"/d' "$HOME/$shell_file" 2>/dev/null
                 fi
-            else
-                echo "Could not handle configuration file $config_file. Please add the following command manually:"
-                echo "$autostart_cmd"
+            done
+
+            # Detect session type and set up appropriate autostart
+            local setup_done=false
+
+            # 1. Check for Hyprland
+            if [ -f "$HOME/.config/hypr/hyprland.conf" ]; then
+                if grep -Fq "auto-sort-downloads.sh" "$HOME/.config/hypr/hyprland.conf"; then
+                    echo "Autostart already configured in hyprland.conf."
+                else
+                    echo "" >> "$HOME/.config/hypr/hyprland.conf"
+                    echo "# Auto-sort downloads startup" >> "$HOME/.config/hypr/hyprland.conf"
+                    echo "exec-once = $HOME/.local/bin/auto-sort-downloads.sh" >> "$HOME/.config/hypr/hyprland.conf"
+                    echo "Added autostart command to hyprland.conf."
+                fi
+                setup_done=true
+            fi
+
+            # 2. Check for XDG Autostart (Desktop Environments)
+            if [ "$setup_done" = false ] && [ -d "$HOME/.config/autostart" ]; then
+                local desktop_file="$HOME/.config/autostart/auto-sort-downloads.desktop"
+                cat > "$desktop_file" << EOF
+[Desktop Entry]
+Type=Application
+Exec=$HOME/.local/bin/auto-sort-downloads.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Auto Sort Downloads
+Comment=Automatically sort downloads folder
+EOF
+                echo "Added autostart entry to $desktop_file."
+                setup_done=true
+            fi
+
+            # 3. Fallback to shell config only if requested or as a last resort
+            if [ "$setup_done" = false ]; then
+                # (Same logic as before but maybe warn that it might show job messages)
+                echo "Could not find a preferred autostart location (Hyprland or XDG)."
+                echo "Please add '$HOME/.local/bin/auto-sort-downloads.sh' to your startup manually."
             fi
             ;;
         * ) 
