@@ -96,14 +96,14 @@ sort_existing_files() {
 
         case "$EXT" in
             pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-            doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
-            jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
-            mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
-            mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
-            zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
-            py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
-            csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
-            appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+            jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
+            mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
+            mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
+            zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
+            py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
+            csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
+            appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
         esac
     done
     echo "Existing files sorted."
@@ -132,14 +132,14 @@ do
     # 4. Sort files based on extension
     case "$EXT" in
         pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-        doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
-        jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
-        mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
-        mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
-        zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
-        py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
-        csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
-        appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+        jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
+        mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
+        mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
+        zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
+        py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
+        csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
+        appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
     esac
 done
 EOF
