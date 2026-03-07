@@ -48,14 +48,14 @@ create_sort_script() {
 DOWNLOAD_DIR="$HOME/Downloads"
 
 # 1. Create all designated folders
-mkdir -p "$DOWNLOAD_DIR/pdf" 
-         "$DOWNLOAD_DIR/images" 
-         "$DOWNLOAD_DIR/videos" 
-         "$DOWNLOAD_DIR/archives" 
-         "$DOWNLOAD_DIR/documents" 
-         "$DOWNLOAD_DIR/music" 
-         "$DOWNLOAD_DIR/code" 
-         "$DOWNLOAD_DIR/datasets" 
+mkdir -p "$DOWNLOAD_DIR/pdf" \
+         "$DOWNLOAD_DIR/images" \
+         "$DOWNLOAD_DIR/videos" \
+         "$DOWNLOAD_DIR/archives" \
+         "$DOWNLOAD_DIR/documents" \
+         "$DOWNLOAD_DIR/music" \
+         "$DOWNLOAD_DIR/code" \
+         "$DOWNLOAD_DIR/datasets" \
          "$DOWNLOAD_DIR/apps"
 
 # Function to move a file while handling duplicates
@@ -83,7 +83,41 @@ move_file() {
     mv "$file" "$dest_path"
 }
 
-# 2. Watch for completely written files AND renamed files
+# 2. Sort any files already present in the Downloads folder
+sort_existing_files() {
+    echo "Sorting existing files in $DOWNLOAD_DIR..."
+    find "$DOWNLOAD_DIR" -maxdepth 1 -type f | while read FILE; do
+        if [ ! -s "$FILE" ]; then
+            continue
+        fi
+
+        EXT="${FILE##*.}"
+        EXT="${EXT,,}"
+
+        case "$EXT" in
+            pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
+            doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+            jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
+            mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
+            mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
+            zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
+            py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
+            csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
+            appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+        esac
+    done
+    echo "Existing files sorted."
+}
+
+# Handle --sort flag: sort existing files only, then exit
+if [ "$1" = "--sort" ] || [ "$1" = "-s" ]; then
+    sort_existing_files
+    exit 0
+fi
+
+sort_existing_files
+
+# 3. Watch for completely written files AND renamed files
 inotifywait -m -e close_write,moved_to --format "%w%f" "$DOWNLOAD_DIR" | while read FILE
 do
     # Ignore directories and files with size 0
@@ -95,7 +129,7 @@ do
     EXT="${FILE##*.}"
     EXT="${EXT,,}"
 
-    # 3. Sort files based on extension
+    # 4. Sort files based on extension
     case "$EXT" in
         pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
         doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
