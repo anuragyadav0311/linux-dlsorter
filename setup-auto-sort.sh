@@ -148,20 +148,68 @@ EOF
     chmod +x "$HOME/.local/bin/auto-sort-downloads.sh"
 }
 
+# Function to setup autostart
+setup_autostart() {
+    echo ""
+    read -p "Do you want to run the auto-sort script automatically at startup? (y/n): " choice
+    case "$choice" in 
+        y|Y ) 
+            # Detect shell and config file
+            local shell_name=$(basename "$SHELL")
+            local config_file=""
+
+            case "$shell_name" in
+                bash) 
+                    config_file="$HOME/.bashrc"
+                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
+                    ;;
+                zsh)
+                    config_file="$HOME/.zshrc"
+                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
+                    ;;
+                fish)
+                    config_file="$HOME/.config/fish/config.fish"
+                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null; or nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
+                    ;;
+                *)
+                    config_file="$HOME/.profile"
+                    autostart_cmd="pgrep -f \"auto-sort-downloads.sh\" > /dev/null || nohup \"$HOME/.local/bin/auto-sort-downloads.sh\" > /dev/null 2>&1 &"
+                    ;;
+            esac
+
+            # Ensure config directory exists
+            mkdir -p "$(dirname "$config_file")"
+
+            if [ -f "$config_file" ] || [ ! -e "$config_file" ]; then
+                # Check if already added
+                if [ -f "$config_file" ] && grep -Fq "auto-sort-downloads.sh" "$config_file"; then
+                    echo "Autostart command already exists in $config_file."
+                else
+                    echo "" >> "$config_file"
+                    echo "# Auto-sort downloads startup" >> "$config_file"
+                    echo "$autostart_cmd" >> "$config_file"
+                    echo "Added autostart command to $config_file."
+                fi
+            else
+                echo "Could not handle configuration file $config_file. Please add the following command manually:"
+                echo "$autostart_cmd"
+            fi
+            ;;
+        * ) 
+            echo "Skipping autostart setup."
+            ;;
+    esac
+}
+
 # --- Main script execution ---
 echo "--- Setting up Auto Sort Downloads ---"
 install_inotify_tools
 create_sort_script
+setup_autostart
 echo "--- Setup Complete! ---"
 echo ""
 echo "The sorting script has been created at: ~/.local/bin/auto-sort-downloads.sh"
 echo ""
-echo "To start sorting your downloads, run this command:"
+echo "To start sorting your downloads manually now, run this command:"
 echo "nohup ~/.local/bin/auto-sort-downloads.sh > /dev/null 2>&1 &"
-echo ""
-echo "To make it run automatically every time you log in, add the above command"
-echo "to your shell's startup file (e.g., ~/.bashrc, ~/.zshrc, or ~/.profile)."
-echo ""
-echo "Example for .bashrc:"
-echo "echo 'nohup ~/.local/bin/auto-sort-downloads.sh > /dev/null 2>&1 &' >> ~/.bashrc"
 echo ""
