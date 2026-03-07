@@ -56,7 +56,8 @@ mkdir -p "$DOWNLOAD_DIR/pdf" \
          "$DOWNLOAD_DIR/music" \
          "$DOWNLOAD_DIR/code" \
          "$DOWNLOAD_DIR/datasets" \
-         "$DOWNLOAD_DIR/apps"
+         "$DOWNLOAD_DIR/apps" \
+         "$DOWNLOAD_DIR/fonts"
 
 # Function to move a file while handling duplicates
 move_file() {
@@ -96,7 +97,7 @@ sort_existing_files() {
 
         case "$EXT" in
             pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
             jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
             mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
             mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
@@ -104,6 +105,7 @@ sort_existing_files() {
             py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
             csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
             appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+            ttf|otf|woff|woff2) move_file "$FILE" "$DOWNLOAD_DIR/fonts/" ;;
         esac
     done
     echo "Existing files sorted."
@@ -132,7 +134,7 @@ do
     # 4. Sort files based on extension
     case "$EXT" in
         pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
         jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
         mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
         mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
@@ -140,6 +142,7 @@ do
         py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
         csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
         appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
+        ttf|otf|woff|woff2) move_file "$FILE" "$DOWNLOAD_DIR/fonts/" ;;
     esac
 done
 EOF
@@ -151,38 +154,65 @@ EOF
 # Function to setup autostart
 setup_autostart() {
     echo ""
-    read -p "Do you want to run the auto-sort script automatically at startup? (y/n): " choice
-    case "$choice" in 
-        y|Y ) 
-            # Cleanup old shell-based autostart if it exists
-            local shells=(".bashrc" ".zshrc" ".profile" ".config/fish/config.fish")
-            for shell_file in "${shells[@]}"; do
-                if [ -f "$HOME/$shell_file" ]; then
-                    sed -i '/# Auto-sort downloads startup/d' "$HOME/$shell_file" 2>/dev/null
-                    sed -i '/pgrep -f "auto-sort-downloads.sh"/d' "$HOME/$shell_file" 2>/dev/null
-                fi
-            done
+    echo "--- Autostart Configuration ---"
+    
+    local CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+    
+    # Cleanup old shell-based autostart if it exists
+    local shells=(".bashrc" ".zshrc" ".profile" ".config/fish/config.fish")
+    for shell_file in "${shells[@]}"; do
+        if [ -f "$HOME/$shell_file" ]; then
+            sed -i '/# Auto-sort downloads startup/d' "$HOME/$shell_file" 2>/dev/null
+            sed -i '/pgrep -f "auto-sort-downloads.sh"/d' "$HOME/$shell_file" 2>/dev/null
+        fi
+    done
 
-            # Detect session type and set up appropriate autostart
-            local setup_done=false
+    echo "How would you like to handle autostart?"
+    echo "1) Systemd user service (Recommended for most modern distros)"
+    echo "2) XDG Autostart (.desktop file, best for GNOME/KDE/XFCE)"
+    echo "3) Hyprland (exec-once in hyprland.conf)"
+    echo "4) None / Manual"
+    
+    local default_choice=1
+    if [ "$XDG_CURRENT_DESKTOP" = "Hyprland" ] || [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+        default_choice=3
+    elif [ -d "$CONFIG_DIR/autostart" ]; then
+        default_choice=2
+    fi
+    
+    read -p "Select an option [$default_choice]: " choice
+    choice=${choice:-$default_choice}
 
-            # 1. Check for Hyprland
-            if [ -f "$HOME/.config/hypr/hyprland.conf" ]; then
-                if grep -Fq "auto-sort-downloads.sh" "$HOME/.config/hypr/hyprland.conf"; then
-                    echo "Autostart already configured in hyprland.conf."
-                else
-                    echo "" >> "$HOME/.config/hypr/hyprland.conf"
-                    echo "# Auto-sort downloads startup" >> "$HOME/.config/hypr/hyprland.conf"
-                    echo "exec-once = $HOME/.local/bin/auto-sort-downloads.sh" >> "$HOME/.config/hypr/hyprland.conf"
-                    echo "Added autostart command to hyprland.conf."
-                fi
-                setup_done=true
+    case "$choice" in
+        1)
+            if command_exists systemctl; then
+                mkdir -p "$CONFIG_DIR/systemd/user"
+                cat > "$CONFIG_DIR/systemd/user/auto-sort-downloads.service" << EOF
+[Unit]
+Description=Auto Sort Downloads Service
+After=network.target
+
+[Service]
+ExecStart=$HOME/.local/bin/auto-sort-downloads.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+                systemctl --user daemon-reload
+                systemctl --user enable auto-sort-downloads.service
+                systemctl --user start auto-sort-downloads.service
+                echo "Systemd user service enabled and started."
+            else
+                echo "systemctl not found. Please choose another method."
+                setup_autostart
             fi
-
-            # 2. Check for XDG Autostart (Desktop Environments)
-            if [ "$setup_done" = false ] && [ -d "$HOME/.config/autostart" ]; then
-                local desktop_file="$HOME/.config/autostart/auto-sort-downloads.desktop"
-                cat > "$desktop_file" << EOF
+            ;;
+        2)
+            mkdir -p "$CONFIG_DIR/autostart"
+            local desktop_file="$CONFIG_DIR/autostart/auto-sort-downloads.desktop"
+            cat > "$desktop_file" << EOF
 [Desktop Entry]
 Type=Application
 Exec=$HOME/.local/bin/auto-sort-downloads.sh
@@ -192,18 +222,25 @@ X-GNOME-Autostart-enabled=true
 Name=Auto Sort Downloads
 Comment=Automatically sort downloads folder
 EOF
-                echo "Added autostart entry to $desktop_file."
-                setup_done=true
-            fi
-
-            # 3. Fallback to shell config only if requested or as a last resort
-            if [ "$setup_done" = false ]; then
-                # (Same logic as before but maybe warn that it might show job messages)
-                echo "Could not find a preferred autostart location (Hyprland or XDG)."
-                echo "Please add '$HOME/.local/bin/auto-sort-downloads.sh' to your startup manually."
+            echo "Added autostart entry to $desktop_file."
+            ;;
+        3)
+            local HYPR_CONF="$CONFIG_DIR/hypr/hyprland.conf"
+            if [ -f "$HYPR_CONF" ]; then
+                if grep -Fq "auto-sort-downloads.sh" "$HYPR_CONF"; then
+                    echo "Autostart already configured in hyprland.conf."
+                else
+                    echo "" >> "$HYPR_CONF"
+                    echo "# Auto-sort downloads startup" >> "$HYPR_CONF"
+                    echo "exec-once = $HOME/.local/bin/auto-sort-downloads.sh" >> "$HYPR_CONF"
+                    echo "Added autostart command to $HYPR_CONF."
+                fi
+            else
+                echo "Hyprland config not found at $HYPR_CONF."
+                setup_autostart
             fi
             ;;
-        * ) 
+        *)
             echo "Skipping autostart setup."
             ;;
     esac
