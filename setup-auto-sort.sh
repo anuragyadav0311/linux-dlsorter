@@ -1,190 +1,201 @@
 #!/bin/bash
 
-# This script sets up the auto-sort-downloads functionality.
+# This script sets up the auto-sort-downloads functionality with a professional TUI and Marker File logic.
 
 # Function to check for a command's existence
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to install inotify-tools if not present
-install_inotify_tools() {
-    if command_exists inotifywait; then
-        echo "inotify-tools is already installed."
+# Function to install dependencies
+install_dependencies() {
+    local pkgs=("inotify-tools" "gum")
+    local missing=()
+
+    for pkg in "${pkgs[@]}"; do
+        if ! command_exists "$pkg"; then
+            missing+=("$pkg")
+        fi
+    done
+
+    if [ ${#missing[@]} -eq 0 ]; then
         return
     fi
 
-    echo "inotify-tools not found. Attempting to install..."
+    echo "Missing dependencies: ${missing[*]}"
+    echo "Attempting to install..."
     
-    # Detect package manager and install
-    if command_exists apt-get; then
-        sudo apt-get update && sudo apt-get install -y inotify-tools
-    elif command_exists pacman; then
-        sudo pacman -S --noconfirm inotify-tools
+    if command_exists pacman; then
+        sudo pacman -S --noconfirm "${missing[@]}"
+    elif command_exists apt-get; then
+        sudo apt-get update && sudo apt-get install -y "${missing[@]}"
     elif command_exists dnf; then
-        sudo dnf install -y inotify-tools
-    elif command_exists yum; then
-        sudo yum install -y inotify-tools
+        sudo dnf install -y "${missing[@]}"
     else
-        echo "Could not find a supported package manager (apt, pacman, dnf, yum)."
-        echo "Please install 'inotify-tools' manually and run this script again."
-        exit 1
-    fi
-
-    if ! command_exists inotifywait; then
-        echo "Failed to install inotify-tools. Please install it manually."
+        echo "Could not find a supported package manager to install: ${missing[*]}"
+        echo "Please install them manually and run this script again."
         exit 1
     fi
 }
 
-# Function to create the auto-sort script
+# Initialize dependencies
+install_dependencies
+
+# --- TUI Configuration Phase ---
+
+gum format "# Auto-Sort Downloads Configuration" \
+           "This utility will configure your Downloads directory for automatic organization." \
+           "Marker files (hidden tags) will be utilized to ensure folder renames do not disrupt functionality."
+
+# 1. Select Categories
+CATEGORIES=$(gum choose --no-limit --header "Select categories to enable (Space to toggle, Enter to confirm):" \
+    "pdf" "images" "videos" "archives" "documents" "music" "code" "datasets" "apps" "fonts")
+
+if [ -z "$CATEGORIES" ]; then
+    echo "No categories selected. Operation terminated."
+    exit 0
+fi
+
+# 2. Define Folder Names
+declare -A FOLDER_NAMES
+for CAT in $CATEGORIES; do
+    NAME=$(gum input --placeholder "Default: $CAT" --value "$CAT" --header "Enter destination folder name for $CAT:")
+    FOLDER_NAMES[$CAT]=${NAME:-$CAT}
+done
+
+# --- Script Generation Phase ---
+
 create_sort_script() {
-    # Ensure the target directory exists
     mkdir -p "$HOME/.local/bin"
+    
+    # Pre-calculate category mapping for the script
+    local MAPPING_BLOCK=""
+    for CAT in "${!FOLDER_NAMES[@]}"; do
+        MAPPING_BLOCK+="    [\"$CAT\"]=\"${FOLDER_NAMES[$CAT]}\" \n"
+    done
 
     # Create the script using a heredoc
-    cat > "$HOME/.local/bin/auto-sort-downloads.sh" << 'EOF'
+    cat > "$HOME/.local/bin/auto-sort-downloads.sh" << EOF
 #!/bin/bash
-DOWNLOAD_DIR="$HOME/Downloads"
+DOWNLOAD_DIR="\$HOME/Downloads"
 
-# 1. Create all designated folders
-mkdir -p "$DOWNLOAD_DIR/pdf" \
-         "$DOWNLOAD_DIR/images" \
-         "$DOWNLOAD_DIR/videos" \
-         "$DOWNLOAD_DIR/archives" \
-         "$DOWNLOAD_DIR/documents" \
-         "$DOWNLOAD_DIR/music" \
-         "$DOWNLOAD_DIR/code" \
-         "$DOWNLOAD_DIR/datasets" \
-         "$DOWNLOAD_DIR/apps" \
-         "$DOWNLOAD_DIR/fonts"
+# Mapping of internal category to default folder name
+declare -A DEFAULT_NAMES
+$(echo -e "$MAPPING_BLOCK")
+
+# Function to find or create a folder based on its marker tag
+get_dest_folder() {
+    local cat="\$1"
+    local tag=".sort_tag_\$cat"
+    local default_name="\${DEFAULT_NAMES[\$cat]}"
+    
+    # Attempt to locate a folder containing the marker tag (limit to 2 levels)
+    local found_path=\$(find "\$DOWNLOAD_DIR" -maxdepth 2 -name "\$tag" -printf '%h\n' | head -n 1)
+    
+    if [ -n "\$found_path" ]; then
+        echo "\$found_path"
+    else
+        # Not found, initialize default directory with marker
+        local dest="\$DOWNLOAD_DIR/\$default_name"
+        mkdir -p "\$dest"
+        touch "\$dest/\$tag"
+        echo "\$dest"
+    fi
+}
+
+# Ensure all enabled folders/tags exist at startup
+for cat in "\${!DEFAULT_NAMES[@]}"; do
+    get_dest_folder "\$cat" > /dev/null
+done
 
 # Function to move a file while handling duplicates
 move_file() {
-    local file="$1"
-    local dest_folder="$2"
-    local filename=$(basename "$file")
-    local dest_path="$dest_folder/$filename"
+    local file="\$1"
+    local dest_folder="\$2"
+    local filename=\$(basename "\$file")
+    local dest_path="\$dest_folder/\$filename"
     local counter=1
 
-    # Check if a file with the same name already exists
-    while [ -e "$dest_path" ]; do
-        # If it exists, append a number to the filename
-        local name="${filename%.*}"
-        local ext="${filename##*.}"
-        if [ "$name" == "$ext" ]; then # Handle files with no extension
-            dest_path="$dest_folder/${name}_$counter"
+    while [ -e "\$dest_path" ]; do
+        local name="\${filename%.*}"
+        local ext="\${filename##*.}"
+        if [ "\$name" == "\$ext" ]; then
+            dest_path="\$dest_folder/\${name}_\$counter"
         else
-            dest_path="$dest_folder/${name}_$counter.$ext"
+            dest_path="\$dest_folder/\${name}_\$counter.\$ext"
         fi
-        counter=$((counter + 1))
+        counter=\$((counter + 1))
     done
 
-    # Move the file to the destination folder with the new name
-    mv "$file" "$dest_path"
+    mv "\$file" "\$dest_path"
 }
 
-# 2. Sort any files already present in the Downloads folder
 sort_existing_files() {
-    echo "Sorting existing files in $DOWNLOAD_DIR..."
-    find "$DOWNLOAD_DIR" -maxdepth 1 -type f | while read FILE; do
-        if [ ! -s "$FILE" ]; then
-            continue
-        fi
+    find "\$DOWNLOAD_DIR" -maxdepth 1 -type f | while read FILE; do
+        if [ ! -s "\$FILE" ]; then continue; fi
+        
+        EXT="\${FILE##*.}"
+        EXT="\${EXT,,}"
 
-        EXT="${FILE##*.}"
-        EXT="${EXT,,}"
-
-        case "$EXT" in
-            pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
-            jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
-            mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
-            mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
-            zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
-            py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
-            csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
-            appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
-            ttf|otf|woff|woff2) move_file "$FILE" "$DOWNLOAD_DIR/fonts/" ;;
+        case "\$EXT" in
+            pdf) [ -v DEFAULT_NAMES[pdf] ] && move_file "\$FILE" "\$(get_dest_folder pdf)" ;;
+            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) [ -v DEFAULT_NAMES[documents] ] && move_file "\$FILE" "\$(get_dest_folder documents)" ;;
+            jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) [ -v DEFAULT_NAMES[images] ] && move_file "\$FILE" "\$(get_dest_folder images)" ;;
+            mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) [ -v DEFAULT_NAMES[videos] ] && move_file "\$FILE" "\$(get_dest_folder videos)" ;;
+            mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) [ -v DEFAULT_NAMES[music] ] && move_file "\$FILE" "\$(get_dest_folder music)" ;;
+            zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) [ -v DEFAULT_NAMES[archives] ] && move_file "\$FILE" "\$(get_dest_folder archives)" ;;
+            py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) [ -v DEFAULT_NAMES[code] ] && move_file "\$FILE" "\$(get_dest_folder code)" ;;
+            csv|json|xml|sql|tsv|parquet) [ -v DEFAULT_NAMES[datasets] ] && move_file "\$FILE" "\$(get_dest_folder datasets)" ;;
+            appimage|deb|rpm|snap|flatpak) [ -v DEFAULT_NAMES[apps] ] && move_file "\$FILE" "\$(get_dest_folder apps)" ;;
+            ttf|otf|woff|woff2) [ -v DEFAULT_NAMES[fonts] ] && move_file "\$FILE" "\$(get_dest_folder fonts)" ;;
         esac
     done
-    echo "Existing files sorted."
 }
 
-# Handle --sort flag: sort existing files only, then exit
-if [ "$1" = "--sort" ] || [ "$1" = "-s" ]; then
+if [ "\$1" = "--sort" ] || [ "\$1" = "-s" ]; then
     sort_existing_files
     exit 0
 fi
 
 sort_existing_files
 
-# 3. Watch for completely written files AND renamed files
-inotifywait -m -e close_write,moved_to --format "%w%f" "$DOWNLOAD_DIR" | while read FILE
+inotifywait -m -e close_write,moved_to --format "%w%f" "\$DOWNLOAD_DIR" | while read FILE
 do
-    # Ignore directories and files with size 0
-    if [ -d "$FILE" ] || [ ! -s "$FILE" ]; then
-        continue
-    fi
+    if [ -d "\$FILE" ] || [ ! -s "\$FILE" ]; then continue; fi
+    EXT="\${FILE##*.}"
+    EXT="\${EXT,,}"
 
-    # Extract the file extension
-    EXT="${FILE##*.}"
-    EXT="${EXT,,}"
-
-    # 4. Sort files based on extension
-    case "$EXT" in
-        pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
-        jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
-        mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
-        mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
-        zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
-        py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
-        csv|json|xml|sql|tsv|parquet) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
-        appimage|deb|rpm|snap|flatpak) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
-        ttf|otf|woff|woff2) move_file "$FILE" "$DOWNLOAD_DIR/fonts/" ;;
+    case "\$EXT" in
+        pdf) [ -v DEFAULT_NAMES[pdf] ] && move_file "\$FILE" "\$(get_dest_folder pdf)" ;;
+        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) [ -v DEFAULT_NAMES[documents] ] && move_file "\$FILE" "\$(get_dest_folder documents)" ;;
+        jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) [ -v DEFAULT_NAMES[images] ] && move_file "\$FILE" "\$(get_dest_folder images)" ;;
+        mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) [ -v DEFAULT_NAMES[videos] ] && move_file "\$FILE" "\$(get_dest_folder videos)" ;;
+        mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) [ -v DEFAULT_NAMES[music] ] && move_file "\$FILE" "\$(get_dest_folder music)" ;;
+        zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) [ -v DEFAULT_NAMES[archives] ] && move_file "\$FILE" "\$(get_dest_folder archives)" ;;
+        py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) [ -v DEFAULT_NAMES[code] ] && move_file "\$FILE" "\$(get_dest_folder code)" ;;
+        csv|json|xml|sql|tsv|parquet) [ -v DEFAULT_NAMES[datasets] ] && move_file "\$FILE" "\$(get_dest_folder datasets)" ;;
+        appimage|deb|rpm|snap|flatpak) [ -v DEFAULT_NAMES[apps] ] && move_file "\$FILE" "\$(get_dest_folder apps)" ;;
+        ttf|otf|woff|woff2) [ -v DEFAULT_NAMES[fonts] ] && move_file "\$FILE" "\$(get_dest_folder fonts)" ;;
     esac
 done
 EOF
 
-    # Make the script executable
     chmod +x "$HOME/.local/bin/auto-sort-downloads.sh"
 }
 
-# Function to setup autostart
+# --- Autostart Phase ---
+
 setup_autostart() {
-    echo ""
-    echo "--- Autostart Configuration ---"
-    
     local CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
     
-    # Cleanup old shell-based autostart if it exists
-    local shells=(".bashrc" ".zshrc" ".profile" ".config/fish/config.fish")
-    for shell_file in "${shells[@]}"; do
-        if [ -f "$HOME/$shell_file" ]; then
-            sed -i '/# Auto-sort downloads startup/d' "$HOME/$shell_file" 2>/dev/null
-            sed -i '/pgrep -f "auto-sort-downloads.sh"/d' "$HOME/$shell_file" 2>/dev/null
-        fi
-    done
+    CHOICE=$(gum choose --header "Select Autostart Method:" \
+        "Systemd user service (Recommended)" \
+        "XDG Autostart (.desktop file)" \
+        "Hyprland (exec-once)" \
+        "None / Manual")
 
-    echo "How would you like to handle autostart?"
-    echo "1) Systemd user service (Recommended for most modern distros)"
-    echo "2) XDG Autostart (.desktop file, best for GNOME/KDE/XFCE)"
-    echo "3) Hyprland (exec-once in hyprland.conf)"
-    echo "4) None / Manual"
-    
-    local default_choice=1
-    if [ "$XDG_CURRENT_DESKTOP" = "Hyprland" ] || [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
-        default_choice=3
-    elif [ -d "$CONFIG_DIR/autostart" ]; then
-        default_choice=2
-    fi
-    
-    read -p "Select an option [$default_choice]: " choice
-    choice=${choice:-$default_choice}
-
-    case "$choice" in
-        1)
+    case "$CHOICE" in
+        *"Systemd"*)
             if command_exists systemctl; then
                 mkdir -p "$CONFIG_DIR/systemd/user"
                 cat > "$CONFIG_DIR/systemd/user/auto-sort-downloads.service" << EOF
@@ -203,16 +214,15 @@ EOF
                 systemctl --user daemon-reload
                 systemctl --user enable auto-sort-downloads.service
                 systemctl --user start auto-sort-downloads.service
-                echo "Systemd user service enabled and started."
+                gum format "Systemd user service enabled and started."
             else
-                echo "systemctl not found. Please choose another method."
+                gum format "Error: systemctl not found."
                 setup_autostart
             fi
             ;;
-        2)
+        *"XDG"*)
             mkdir -p "$CONFIG_DIR/autostart"
-            local desktop_file="$CONFIG_DIR/autostart/auto-sort-downloads.desktop"
-            cat > "$desktop_file" << EOF
+            cat > "$CONFIG_DIR/autostart/auto-sort-downloads.desktop" << EOF
 [Desktop Entry]
 Type=Application
 Exec=$HOME/.local/bin/auto-sort-downloads.sh
@@ -222,39 +232,32 @@ X-GNOME-Autostart-enabled=true
 Name=Auto Sort Downloads
 Comment=Automatically sort downloads folder
 EOF
-            echo "Added autostart entry to $desktop_file."
+            gum format "Added autostart entry to $CONFIG_DIR/autostart/auto-sort-downloads.desktop."
             ;;
-        3)
+        *"Hyprland"*)
             local HYPR_CONF="$CONFIG_DIR/hypr/hyprland.conf"
             if [ -f "$HYPR_CONF" ]; then
-                if grep -Fq "auto-sort-downloads.sh" "$HYPR_CONF"; then
-                    echo "Autostart already configured in hyprland.conf."
-                else
+                if ! grep -Fq "auto-sort-downloads.sh" "$HYPR_CONF"; then
                     echo "" >> "$HYPR_CONF"
                     echo "# Auto-sort downloads startup" >> "$HYPR_CONF"
                     echo "exec-once = $HOME/.local/bin/auto-sort-downloads.sh" >> "$HYPR_CONF"
-                    echo "Added autostart command to $HYPR_CONF."
                 fi
+                gum format "Added autostart command to $HYPR_CONF."
             else
-                echo "Hyprland config not found at $HYPR_CONF."
+                gum format "Error: Hyprland config not found at $HYPR_CONF."
                 setup_autostart
             fi
             ;;
         *)
-            echo "Skipping autostart setup."
+            gum format "Skipping autostart configuration."
             ;;
     esac
 }
 
-# --- Main script execution ---
-echo "--- Setting up Auto Sort Downloads ---"
-install_inotify_tools
+# --- Execution ---
 create_sort_script
 setup_autostart
-echo "--- Setup Complete! ---"
-echo ""
-echo "The sorting script has been created at: ~/.local/bin/auto-sort-downloads.sh"
-echo ""
-echo "To start sorting your downloads manually now, run this command:"
-echo "nohup ~/.local/bin/auto-sort-downloads.sh > /dev/null 2>&1 &"
-echo ""
+
+gum format "## Setup Complete" \
+           "The application is installed at: \`~/.local/bin/auto-sort-downloads.sh\`" \
+           "Destination folders in \`~/Downloads\` may now be renamed without impacting functionality."
