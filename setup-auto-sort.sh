@@ -137,17 +137,16 @@ sort_existing_files() {
         EXT="\${FILE##*.}"
         EXT="\${EXT,,}"
 
-        case "\$EXT" in
-            pdf) [ -v DEFAULT_NAMES[pdf] ] && move_file "\$FILE" "\$(get_dest_folder pdf)" ;;
-            doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) [ -v DEFAULT_NAMES[documents] ] && move_file "\$FILE" "\$(get_dest_folder documents)" ;;
-            jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) [ -v DEFAULT_NAMES[images] ] && move_file "\$FILE" "\$(get_dest_folder images)" ;;
-            mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) [ -v DEFAULT_NAMES[videos] ] && move_file "\$FILE" "\$(get_dest_folder videos)" ;;
-            mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) [ -v DEFAULT_NAMES[music] ] && move_file "\$FILE" "\$(get_dest_folder music)" ;;
-            zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) [ -v DEFAULT_NAMES[archives] ] && move_file "\$FILE" "\$(get_dest_folder archives)" ;;
-            py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) [ -v DEFAULT_NAMES[code] ] && move_file "\$FILE" "\$(get_dest_folder code)" ;;
-            csv|json|xml|sql|tsv|parquet) [ -v DEFAULT_NAMES[datasets] ] && move_file "\$FILE" "\$(get_dest_folder datasets)" ;;
-            appimage|deb|rpm|snap|flatpak) [ -v DEFAULT_NAMES[apps] ] && move_file "\$FILE" "\$(get_dest_folder apps)" ;;
-            ttf|otf|woff|woff2) [ -v DEFAULT_NAMES[fonts] ] && move_file "\$FILE" "\$(get_dest_folder fonts)" ;;
+        case "$EXT" in
+            pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
+            doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+            jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
+            mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
+            mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
+            zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
+            py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
+            csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
+            appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
         esac
     done
 }
@@ -165,17 +164,17 @@ do
     EXT="\${FILE##*.}"
     EXT="\${EXT,,}"
 
-    case "\$EXT" in
-        pdf) [ -v DEFAULT_NAMES[pdf] ] && move_file "\$FILE" "\$(get_dest_folder pdf)" ;;
-        doc|docx|odt|rtf|txt|ppt|pptx|xls|xlsx|ods|odp|odg|epub|md|tex) [ -v DEFAULT_NAMES[documents] ] && move_file "\$FILE" "\$(get_dest_folder documents)" ;;
-        jpg|jpeg|png|gif|webp|svg|bmp|tiff|tif|ico|heic|raw) [ -v DEFAULT_NAMES[images] ] && move_file "\$FILE" "\$(get_dest_folder images)" ;;
-        mp4|mkv|webm|avi|mov|flv|wmv|3gp|ts|vob|m4v) [ -v DEFAULT_NAMES[videos] ] && move_file "\$FILE" "\$(get_dest_folder videos)" ;;
-        mp3|wav|flac|ogg|aac|wma|m4a|opus|aiff) [ -v DEFAULT_NAMES[music] ] && move_file "\$FILE" "\$(get_dest_folder music)" ;;
-        zip|tar|gz|rar|7z|bz2|xz|zst|cab|iso) [ -v DEFAULT_NAMES[archives] ] && move_file "\$FILE" "\$(get_dest_folder archives)" ;;
-        py|cpp|c|h|hpp|sh|js|ipynb|html|css|ts|jsx|tsx|go|rs|java|rb|php|swift|kt|vue|yaml|yml|toml|r) [ -v DEFAULT_NAMES[code] ] && move_file "\$FILE" "\$(get_dest_folder code)" ;;
-        csv|json|xml|sql|tsv|parquet) [ -v DEFAULT_NAMES[datasets] ] && move_file "\$FILE" "\$(get_dest_folder datasets)" ;;
-        appimage|deb|rpm|snap|flatpak) [ -v DEFAULT_NAMES[apps] ] && move_file "\$FILE" "\$(get_dest_folder apps)" ;;
-        ttf|otf|woff|woff2) [ -v DEFAULT_NAMES[fonts] ] && move_file "\$FILE" "\$(get_dest_folder fonts)" ;;
+    # 4. Sort files based on extension
+    case "$EXT" in
+        pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
+        doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
+        jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
+        mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
+        mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
+        zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
+        py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
+        csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
+        appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
     esac
 done
 EOF

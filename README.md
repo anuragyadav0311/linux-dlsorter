@@ -17,15 +17,14 @@ A background script that automatically organizes your Linux downloads — sortin
 | Folder         | Extensions                                          |
 |----------------|-----------------------------------------------------|
 | `pdf/`         | `.pdf`                                              |
-| `documents/`   | `.doc` `.docx` `.odt` `.rtf` `.txt` `.ppt` `.pptx` `.xls` `.xlsx` `.ods` `.odp` `.odg` `.epub` `.md` `.tex` |
-| `images/`      | `.jpg` `.jpeg` `.png` `.gif` `.webp` `.svg` `.bmp` `.tiff` `.tif` `.ico` `.heic` `.raw` |
-| `videos/`      | `.mp4` `.mkv` `.webm` `.avi` `.mov` `.flv` `.wmv` `.3gp` `.ts` `.vob` `.m4v` |
-| `music/`       | `.mp3` `.wav` `.flac` `.ogg` `.aac` `.wma` `.m4a` `.opus` `.aiff` |
-| `archives/`    | `.zip` `.tar` `.gz` `.rar` `.7z` `.bz2` `.xz` `.zst` `.cab` `.iso` |
-| `code/`        | `.py` `.cpp` `.c` `.h` `.hpp` `.sh` `.js` `.ipynb` `.html` `.css` `.ts` `.jsx` `.tsx` `.go` `.rs` `.java` `.rb` `.php` `.swift` `.kt` `.vue` `.yaml` `.yml` `.toml` `.r` |
-| `datasets/`    | `.csv` `.json` `.xml` `.sql` `.tsv` `.parquet`      |
-| `apps/`        | `.appimage` `.deb` `.rpm` `.snap` `.flatpak`        |
-| `fonts/`       | `.ttf` `.otf` `.woff` `.woff2`                      |
+| `documents/`   | `.doc` `.docx` `.odt` `.rtf` `.txt`                 |
+| `images/`      | `.jpg` `.jpeg` `.png` `.gif` `.webp` `.svg`         |
+| `videos/`      | `.mp4` `.mkv` `.webm` `.avi` `.mov`                 |
+| `music/`       | `.mp3` `.wav` `.flac` `.ogg`                        |
+| `archives/`    | `.zip` `.tar` `.gz` `.rar` `.7z`                    |
+| `code/`        | `.py` `.cpp` `.c` `.h` `.hpp` `.sh` `.js` `.ipynb` `.html` `.css` |
+| `datasets/`    | `.csv` `.json` `.xml` `.sql`                        |
+| `apps/`        | `.appimage` `.deb` `.rpm`                           |
 
 ---
 
