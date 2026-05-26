@@ -49,7 +49,8 @@ gum format "# Auto-Sort Downloads Configuration" \
 
 # 1. Select Categories
 CATEGORIES=$(gum choose --no-limit --header "Select categories to enable (Space to toggle, Enter to confirm):" \
-    "pdf" "images" "videos" "archives" "documents" "music" "code" "datasets" "apps" "fonts")
+    "pdf" "documents" "presentations" "spreadsheets" "images" "videos" "music" "archives" \
+    "code" "datasets" "fonts" "ebooks" "designs" "3d_models" "configs" "apps")
 
 if [ -z "$CATEGORIES" ]; then
     echo "No categories selected. Operation terminated."
@@ -130,24 +131,35 @@ move_file() {
     mv "\$file" "\$dest_path"
 }
 
+sort_file() {
+    local file="\$1"
+    local ext="\${file##*.}"
+    ext="\${ext,,}"
+
+    case "\$ext" in
+        pdf) [ -n "\${DEFAULT_NAMES[pdf]}" ] && move_file "\$file" "\$(get_dest_folder pdf)" ;;
+        doc|docx|odt|ott|rtf|txt|text|md|markdown|tex|pages|wpd|wps) [ -n "\${DEFAULT_NAMES[documents]}" ] && move_file "\$file" "\$(get_dest_folder documents)" ;;
+        ppt|pptx|pptm|pps|ppsx|odp|otp|key) [ -n "\${DEFAULT_NAMES[presentations]}" ] && move_file "\$file" "\$(get_dest_folder presentations)" ;;
+        xls|xlsx|xlsm|xlsb|ods|ots|numbers) [ -n "\${DEFAULT_NAMES[spreadsheets]}" ] && move_file "\$file" "\$(get_dest_folder spreadsheets)" ;;
+        jpg|jpeg|png|gif|webp|svg|bmp|tif|tiff|heic|heif|avif|ico|raw|cr2|nef|arw|dng) [ -n "\${DEFAULT_NAMES[images]}" ] && move_file "\$file" "\$(get_dest_folder images)" ;;
+        mp4|mkv|webm|avi|mov|wmv|flv|m4v|mpg|mpeg|3gp|ts) [ -n "\${DEFAULT_NAMES[videos]}" ] && move_file "\$file" "\$(get_dest_folder videos)" ;;
+        mp3|wav|flac|ogg|oga|m4a|aac|wma|opus|mid|midi) [ -n "\${DEFAULT_NAMES[music]}" ] && move_file "\$file" "\$(get_dest_folder music)" ;;
+        zip|tar|gz|tgz|bz2|tbz2|xz|txz|rar|7z|zst|lz|lzma|iso) [ -n "\${DEFAULT_NAMES[archives]}" ] && move_file "\$file" "\$(get_dest_folder archives)" ;;
+        py|pyw|js|mjs|cjs|ts|tsx|jsx|java|c|cc|cpp|cxx|h|hh|hpp|cs|go|rs|rb|php|swift|kt|kts|scala|lua|pl|pm|r|sh|bash|zsh|fish|ps1|bat|cmd|html|htm|css|scss|sass|less|vue|svelte|ipynb|sql|dockerfile|makefile) [ -n "\${DEFAULT_NAMES[code]}" ] && move_file "\$file" "\$(get_dest_folder code)" ;;
+        csv|tsv|json|jsonl|ndjson|xml|parquet|avro|orc|feather|db|sqlite|sqlite3|h5|hdf5|pkl|pickle|sav|dta|xpt|arff|mat) [ -n "\${DEFAULT_NAMES[datasets]}" ] && move_file "\$file" "\$(get_dest_folder datasets)" ;;
+        ttf|otf|woff|woff2|eot|fon|fnt) [ -n "\${DEFAULT_NAMES[fonts]}" ] && move_file "\$file" "\$(get_dest_folder fonts)" ;;
+        epub|mobi|azw|azw3|fb2|djvu|cbz|cbr|lit|lrf) [ -n "\${DEFAULT_NAMES[ebooks]}" ] && move_file "\$file" "\$(get_dest_folder ebooks)" ;;
+        psd|psb|ai|eps|indd|idml|fig|sketch|xd|afdesign|afphoto|ase|cdr) [ -n "\${DEFAULT_NAMES[designs]}" ] && move_file "\$file" "\$(get_dest_folder designs)" ;;
+        obj|fbx|stl|glb|gltf|dae|3ds|blend|ply|step|stp|iges|igs|usd|usdz) [ -n "\${DEFAULT_NAMES[3d_models]}" ] && move_file "\$file" "\$(get_dest_folder 3d_models)" ;;
+        yaml|yml|toml|ini|conf|cfg|env|properties|plist|desktop|service|lock) [ -n "\${DEFAULT_NAMES[configs]}" ] && move_file "\$file" "\$(get_dest_folder configs)" ;;
+        appimage|deb|rpm|flatpakref|flatpak|snap|apk|exe|msi|pkg|dmg|run|bin) [ -n "\${DEFAULT_NAMES[apps]}" ] && move_file "\$file" "\$(get_dest_folder apps)" ;;
+    esac
+}
+
 sort_existing_files() {
     find "\$DOWNLOAD_DIR" -maxdepth 1 -type f | while read FILE; do
         if [ ! -s "\$FILE" ]; then continue; fi
-        
-        EXT="\${FILE##*.}"
-        EXT="\${EXT,,}"
-
-        case "$EXT" in
-            pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-            doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
-            jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
-            mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
-            mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
-            zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
-            py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
-            csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
-            appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
-        esac
+        sort_file "\$FILE"
     done
 }
 
@@ -161,21 +173,7 @@ sort_existing_files
 inotifywait -m -e close_write,moved_to --format "%w%f" "\$DOWNLOAD_DIR" | while read FILE
 do
     if [ -d "\$FILE" ] || [ ! -s "\$FILE" ]; then continue; fi
-    EXT="\${FILE##*.}"
-    EXT="\${EXT,,}"
-
-    # 4. Sort files based on extension
-    case "$EXT" in
-        pdf) move_file "$FILE" "$DOWNLOAD_DIR/pdf/" ;;
-        doc|docx|odt|rtf|txt) move_file "$FILE" "$DOWNLOAD_DIR/documents/" ;;
-        jpg|jpeg|png|gif|webp|svg) move_file "$FILE" "$DOWNLOAD_DIR/images/" ;;
-        mp4|mkv|webm|avi|mov) move_file "$FILE" "$DOWNLOAD_DIR/videos/" ;;
-        mp3|wav|flac|ogg) move_file "$FILE" "$DOWNLOAD_DIR/music/" ;;
-        zip|tar|gz|rar|7z) move_file "$FILE" "$DOWNLOAD_DIR/archives/" ;;
-        py|cpp|c|h|hpp|sh|js|ipynb|html|css) move_file "$FILE" "$DOWNLOAD_DIR/code/" ;;
-        csv|json|xml|sql) move_file "$FILE" "$DOWNLOAD_DIR/datasets/" ;;
-        appimage|deb|rpm) move_file "$FILE" "$DOWNLOAD_DIR/apps/" ;;
-    esac
+    sort_file "\$FILE"
 done
 EOF
 
